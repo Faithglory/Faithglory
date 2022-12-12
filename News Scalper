@@ -1,0 +1,650 @@
+// Version 1.0, December, 2022
+// A forex algorithm for fully automated trading and efficient trading in multiple timeframes, and equippoed with effective, profitable money management. 
+// Copyright © Faithglory 
+
+
+// Appreciation to Copyright ©2011-2020, ForexEAdvisor.com
+//  for using the site as my startup in Mql4 code learning and development.
+#property strict;
+
+extern int NewsMagicNumber=2022;
+extern double Lots =0.20;
+extern double StopLoss=50;
+extern double TakeProfit=150;
+extern int TrailingStop=0;
+extern double PartialProfits=5;
+extern int LookbackPeriod=5;
+extern int Slippage=3;
+
+extern int news_timeframe=30;
+extern int news_offset=1;
+
+double news_tp1=0;
+double news_tp2=0;
+extern int NewsMonday1_start=0 ;
+extern int NewsMonday1_stop=0 ;
+extern int NewsMonday2_start=0 ;
+extern int NewsMonday2_stop=0 ;
+extern int NewsMonday3_start=0 ;
+extern int NewsMonday3_stop=0 ;
+
+extern int NewsTuesday1_start=0 ;
+extern int NewsTuesday1_stop=0 ;
+extern int NewsTuesday2_start=0 ;
+extern int NewsTuesday2_stop=0 ;
+extern int NewsTuesday3_start=0 ;
+extern int NewsTuesday3_stop=0 ;
+
+extern int NewsWednesday1_start=0 ;
+extern int NewsWednesday1_stop=0 ;
+extern int NewsWednesday2_start=0 ;
+extern int NewsWednesday2_stop=0 ;
+extern int NewsWednesday3_start=0 ;
+extern int NewsWednesday3_stop=0 ;
+
+extern int NewsThursday1_start=0 ;
+extern int NewsThursday1_stop=0 ;
+extern int NewsThursday2_start=0 ;
+extern int NewsThursday2_stop=0;
+extern int NewsThursday3_start=0 ;
+extern int NewsThursday3_stop=0 ;
+
+extern int NewsFriday1_start=0 ;
+extern int NewsFriday1_stop=0 ;
+extern int NewsFriday2_start=0 ;
+extern int NewsFriday2_stop=0 ;
+extern int NewsFriday3_start=0 ;
+extern int NewsFriday3_stop=0 ;
+
+int buyPosition=0;
+int sellPosition=0;
+double BuyLotBalance=0;
+double SellLotBalance=0;
+
+int ThisBarTrade=0;
+//input double offsetM1=0.5;
+//input double offsetM5=1;
+//input double offsetM15=2;
+//input double offsetH1=3;
+//input double offsetH4=5;
+
+//datetime NewCandleTime = 0;
+
+double theLots;
+
+int buy_ticket=0;
+int sell_ticket=0;
+
+//datetime PrevBuy;
+//datetime PrevSell;
+//+------------------------------------------------------------------+
+//    expert start function
+//+------------------------------------------------------------------+
+int start()
+{
+  double MyPoint=Point;
+  if(Digits==3 || Digits==5) MyPoint=Point*10;
+  
+ // refresh memory 
+  RefreshRates(); 
+// ___________________________________________________
+//👇TRADING SECTION FOR TIMEFRAME M1👇
+
+if(NewsMagicNumber>0)
+{
+// check if no existing open buy order 
+  if(TotalNewsBuyOrdersCount()==0) 
+  {
+    news_buyPosition=0;
+    news_BuyLotBalance=0;
+    news_Lots=0;
+    
+    double TheStopLoss=0;
+    double TheTakeProfit=0;  
+     
+   int result=0;
+   
+   if(EcoNews()==1)
+   {
+   if(Bars!=ThisBarTrade)
+   {
+   ThisBarTrade=Bars;  
+   // Close any open Sell order before 
+   // opening buy order since the trend has
+   // reversed.
+      if(TotalNewsSellOrdersCount() >0)
+      {
+         
+        if(OrderClose(news_sell_ticket,OrderLots(),
+          OrderClosePrice(),Slippage,Red))
+          {
+          news_SellLotBalance=0;
+          news_sell_ticket=0;
+          Comment("Sell order closed"); 
+          } 
+      } 
+      
+// get Lot size
+      if(Lots>0)
+      {
+        news_Lots=Lots;
+        if((news_BuyLotBalance>0)
+         &&(news_buyPosition>0))
+        { 
+          news_Lots=news_BuyLotBalance;
+        } 
+      } 
+      else return(0) ; Print("Error getting Lot size. Please input lot size") ;
+      
+ // Calculate the Entry point for buystop order
+       int epBar=iHighest(Symbol(), news_timeframe, MODE_HIGH,
+              LookbackPeriod, 1);
+            double epPrice=iHigh(Symbol(), news_timeframe, epBar);          
+            epPrice=epPrice+(news_offset*MyPoint);
+            
+// Open BuyStop Order
+      result=OrderSend(Symbol(),OP_BUYSTOP,news_Lots,
+            NormalizeDouble(epPrice,Digits),Slippage,0,0,"Oluwasegun",MagicNumber,
+               0,Blue);
+   
+        if(result>0)
+        {
+         news_buyPosition=1;
+         TheStopLoss=0;
+         TheTakeProfit=0;
+            ;
+          if(news_StopLoss>0)
+          { 
+          TheStopLoss=Ask-news_StopLoss*MyPoint;
+  // Calculate the StopLoss for buystop order
+   int sl_Bar=iLowest(Symbol(), news_timeframe, MODE_LOW,
+              NewsLookbackPeriod, 1);
+            double sl_Price=iLow(Symbol(), news_timeframe, sl_Bar);  
+            sl_Price=sl_Price-(news_offset*MyPoint);
+            
+            if(OrderOpenPrice()-sl_Price<news_StopLoss*MyPoint) 
+               {
+                TheStopLoss=slPrice;
+               } 
+            if(OrderOpenPrice()-slPrice>(news_StopLoss*MyPoint)) 
+               {
+                TheStopLoss=Ask-news_StopLoss*MyPoint; 
+               } 
+           } 
+           
+           news_tp1=OrderOpenPrice()+TheStopLoss;
+           news_tp2=(OrderOpenPrice()+TheStopLoss)*2;
+           TheTakeProfit=epPrice+(ep_Price+TheStopLoss)*3;
+           
+            if(OrderSelect(result,SELECT_BY_TICKET))
+             {
+            if(OrderModify(OrderTicket(),
+                     OrderOpenPrice(),
+               NormalizeDouble(TheStopLoss,Digits),
+                  NormalizeDouble(TheTakeProfit,Digits),
+                  0,Green)) 
+             news_buyPosition=1;
+            Comment("buystop position opened and updated") ;
+         } 
+         } 
+       }
+       }
+      }
+     }
+    } 
+   } 
+ }} 
+// check if no existing open buy order 
+  if(TotalSellOrdersCount()==0) 
+  {
+    news_sellPosition=0;
+    news_sellLotBalance=0;
+    news_Lots=0;
+    
+    double TheStopLoss=0;
+    double TheTakeProfit=0;  
+     
+   int result=0;
+   
+   if(EcoNews()==1)
+   {
+   if(Bars!=ThisBarTrade)
+   {
+   ThisBarTrade=Bars;  
+   // Close any open buy order before 
+   // opening sell order since the trend has
+   // reversed.
+      if(TotalNewsSellOrdersCount() >0)
+      {
+         
+        if(OrderClose(news_buy_ticket,OrderLots(),
+          OrderClosePrice(),Slippage,Red))
+          {
+          news_BuyLotBalance=0;
+          news_buy_ticket=0;
+          Comment("Buy order closed"); 
+          } 
+      } 
+      
+// get Lot size
+      if(Lots>0)
+      {
+        news_Lots=Lots;
+        if((news_SellLotBalance>0)
+         &&(news_sellPosition>0))
+        { 
+          news_Lots=news_SellLotBalance;
+        } 
+      } 
+      else return(0) ; Print("Error getting Lot size. Please input lot size") ;
+      
+ // Calculate the Entry point for sellstop order
+       int epBar=iLowest(Symbol(), news_timeframe, MODE_LOW,
+              LookbackPeriod, 1);
+            double epPrice=iLow(Symbol(), news_timeframe, epBar);          
+            epPrice=epPrice-(news_offset*MyPoint);
+            
+// Open BuyStop Order
+      result=OrderSend(Symbol(),OP_SELLSTOP,news_Lots,
+            NormalizeDouble(epPrice,Digits),Slippage,0,0,"SegunNews",MagicNumber,
+               0,Blue);
+   
+        if(result>0)
+        {
+         news_sellPosition=1;
+         TheStopLoss=0;
+         TheTakeProfit=0;
+            ;
+          if(news_StopLoss>0)
+          { 
+          TheStopLoss=Ask-news_StopLoss*MyPoint;
+  // Calculate the StopLoss for sellstop order
+   int sl_Bar=iHighest(Symbol(), news_timeframe, MODE_HIGH,
+              NewsLookbackPeriod, 1);
+            double sl_Price=iHigh(Symbol(), news_timeframe, sl_Bar);  
+            sl_Price=sl_Price+(news_offset*MyPoint);
+            
+            if(sl_Price-OrderOpenPrice()<news_StopLoss*MyPoint) 
+               {
+                TheStopLoss=slPrice;
+               } 
+            if(OrderOpenPrice()-slPrice>(news_StopLoss*MyPoint)) 
+               {
+                TheStopLoss=Ask-news_StopLoss*MyPoint; 
+               } 
+           } 
+           news_tp1=OrderOpenPrice()-TheStopLoss;
+           news_tp2=(OrderOpenPrice()-TheStopLoss)*2;
+           TheTakeProfit=epPrice+(ep_Price-TheStopLoss)*3;
+           
+            if(OrderSelect(result,SELECT_BY_TICKET))
+             {
+            if(OrderModify(OrderTicket(),
+                     OrderOpenPrice(),
+               NormalizeDouble(TheStopLoss,Digits),
+                  NormalizeDouble(TheTakeProfit,Digits),
+                  0,Green)) 
+             news_sellPosition=1;
+            Comment("sellstop position opened and updated") ;
+         } 
+         } 
+       }
+       }
+      }
+     }
+    } 
+   } 
+ }} 
+ 
+ LOOP FOR TAKING PARTIAL PROFITS, UPDATING
+// STOPLOSSES AND FINAL CLOSING OF ORDER
+   //_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+for(int cnt=0;cnt<OrdersTotal();cnt++)
+{
+if(!OrderSelect(cnt, SELECT_BY_POS, MODE_TRADES))  
+         Comment("Unable to select order") ;
+      if(OrderSymbol()==Symbol() &&
+           (OrderMagicNumber()==NewsMagicNumber) )  
+        {
+           // BUY position ==============     
+if(OrderType()==OP_BUY)  
+  {  
+
+//setting stop losses
+
+      // Set a breakeven stop loss
+           if(OrderLots()==Lots/2) 
+              if(OrderModify(OrderTicket(),
+               OrderOpenPrice(),OrderOpenPrice()+(1*MyPoint),
+               OrderTakeProfit(),0,Green)) 
+                  Comment("Order stoploss modified") ;
+
+      // Set first step stop loss
+           if(OrderLots()==Lots/4) 
+              if(OrderModify(OrderTicket(),
+               OrderOpenPrice(),OrderOpenPrice()+(pProfit*1.5*MyPoint),
+               OrderTakeProfit(),0,Green)) 
+                  Comment("Order stoploss modified") ;
+
+
+        if(pProfit>0) 
+        { 
+        // TP1
+           if((Bid-OrderOpenPrice())>
+               news_tp1)
+                  &&(OrderLots()==news_Lots))
+            {
+            if(OrderClose(OrderTicket(),OrderLots()/2,
+               OrderClosePrice(),Slippage,Red))
+                BuyLotBalance=Lots/2;
+                Comment("Target Profit1 hit");
+                                         
+           }
+    
+         // TP2
+           if((Bid-OrderOpenPrice())>
+               news_tp2)
+                  &&(OrderLots()==theLots/2))
+            {
+            if(OrderClose(OrderTicket(),OrderLots()/2 ,
+               OrderClosePrice(),Slippage,Red))
+                BuyLotBalance=Lots/4;
+                Comment("Target Profit2 hit");
+                                         
+           }
+                   
+           }
+       } 
+    // SELL position ====================
+    if(OrderType()==OP_SELL)
+       {
+      // Set a breakeven stop loss
+       // Set a breakeven stop loss
+           if(OrderLots()==Lots/2) 
+              if(OrderModify(OrderTicket(),
+               OrderOpenPrice(),OrderOpenPrice()+(1*MyPoint),
+               OrderTakeProfit(),0,Green)) 
+                  Comment("Order stoploss modified") ;
+
+      // Set first step stop loss
+           if(OrderLots()==Lots/8) 
+              if(OrderModify(OrderTicket(),
+               OrderOpenPrice(),OrderOpenPrice()+(pProfit*1.5*MyPoint),
+               OrderTakeProfit(),0,Green)) 
+                  Comment("Order stoploss modified") ;
+
+        // TP1
+           if((OrderOpenPrice()-Ask)>
+               news_tp1)
+                  &&(OrderLots()==news_Lots))
+            {
+            if(OrderClose(OrderTicket(),OrderLots()/2,
+               OrderClosePrice(),Slippage,Red))
+                SellLotBalance=Lots/2;
+                Comment("Target Profit1 hit");
+                                         
+           }
+    
+         // TP2
+           if((OrderOpenPrice())-Ask>
+               (news_tp2)
+                  &&(OrderLots()==news_Lots/2))
+            {
+            if(OrderClose(OrderTicket(),OrderLots()/2 ,
+               OrderClosePrice(),Slippage,Red))
+                SellLotBalance=Lots/4;
+                Comment("Target Profit2 hit");
+           }
+           } 
+          }
+        } 
+       }
+      } 
+   return(0);
+}
+
+// _M1__________________________________________________
+
+
+int TotalBuyOrdersCount()
+{
+  int result=0;
+  for(int i=0;i<OrdersTotal();i++)
+  {
+  if(OrderSelect(i,SELECT_BY_POS ,MODE_TRADES)) 
+   {
+    if(OrderMagicNumber()==MagicNumber)
+     {
+     if(OrderType()==OP_BUY) 
+      { 
+       result++; buy_ticket=OrderTicket() ;
+      }
+     }
+   } 
+  } 
+  return (result);
+}
+
+M/ total buy orders count
+int TotalNewsSellOrdersCount()
+{
+  int result=0;
+  for(int i=0;i<OrdersTotal();i++)
+  {
+  if(OrderSelect(i,SELECT_BY_POS ,MODE_TRADES))
+   {
+    if(OrderMagicNumber()==NewsMagicNumber)
+     {
+     if(OrderType()==OP_SELL) 
+      { 
+       result++; sell_ticket=OrderTicket() ;
+      }
+     }
+   } 
+  } 
+  return (result);
+}
+int TotalNewsBuyOrdersCount()
+{
+  int result=0;
+  for(int i=0;i<OrdersTotal();i++)
+  {
+  if(OrderSelect(i,SELECT_BY_POS ,MODE_TRADES)) 
+   {
+    if(OrderMagicNumber()==NewsMagicNumber)
+     {
+     if(OrderType()==OP_BUY) 
+      { 
+       result++; buy_ticket=OrderTicket() ;
+      }
+     }
+   } 
+  } 
+  return (result);
+}
+
+int TotalSellOrdersCount()
+{
+  int result=0;
+  for(int i=0;i<OrdersTotal();i++)
+  {
+  if(OrderSelect(i,SELECT_BY_POS ,MODE_TRADES))
+   {
+    if(OrderMagicNumber()==MagicNumber)
+     {
+     if(OrderType()==OP_SELL) 
+      { 
+       result++; sell_ticket=OrderTicket() ;
+      }
+     }
+   } 
+  } 
+  return (result);
+}
+
+/*
+bool NewBar()
+{
+   static datetime prevTime=0;
+   datetime now=iTime(Symbol(), Period(), 0);
+   if(now==prevTime) return(false) ;
+   prevTime=now;
+   return(true) ;
+}
+*/
+int EcoNews()
+{
+   int result=0;
+   if((NewsMonday1_start>0)  && (NewsMonday1_stop>0 )) 
+   {
+    datetime m_start1=NewsMonday1_start ;
+    datetime m_stop1=NewsMonday1_stop; 
+    if((DayOfWeek()==1) && (Hour() > m_start1 && Hour() < m_stop1)) 
+      {
+        result=1;
+      } 
+   }
+   if((NewsMonday2_start>0)  && (NewsMonday2_stop>0 )) 
+   {
+    datetime m_start2=NewsMonday2_start ;
+    datetime m_stop2=NewsMonday2_stop; 
+    if((DayOfWeek()==1) && (Hour() > m_start2 && Hour() < m_stop2)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsMonday3_start>0)  && (NewsMonday3_stop>0 )) 
+   {
+    datetime m_start3=NewsMonday3_start ;
+    datetime m_stop3=NewsMonday3_stop; 
+    if((DayOfWeek()==1) && (Hour() > m_start3 && Hour() < m_stop3)) 
+      {
+        result=1;
+      } 
+   } 
+    if((NewsTuesday1_start>0)  && (NewsTuesday1_stop>0 )) 
+   {
+    datetime t_start1=NewsTuesday1_start ;
+    datetime t_stop1=NewsTuesday1_stop; 
+    if((DayOfWeek()==2) && (Hour() > t_start1 && Hour() < t_stop1)) 
+      {
+        result=1;
+      } 
+   }
+   if((NewsTuesday2_start>0)  && (NewsTuesday2_stop>0 )) 
+   {
+    datetime t_start2=NewsTuesday2_start ;
+    datetime t_stop2=NewsTuesday2_stop; 
+    if((DayOfWeek()==2) && (Hour() > t_start2 && Hour() < t_stop2)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsTuesday3_start>0)  && (NewsTuesday3_stop>0 )) 
+   {
+    datetime t_start3=NewsTuesday3_start ;
+    datetime t_stop3=NewsTuesday3_stop; 
+    if((DayOfWeek()==2) && (Hour() > t_start3 && Hour() < t_stop3)) 
+      {
+        result=1;
+      } 
+   } 
+   
+    if((NewsWednesday1_start>0)  && (NewsWednesday1_stop>0 )) 
+   {
+    datetime w_start1=NewsWednesday1_start ;
+    datetime w_stop1=NewsWednesday1_stop; 
+    if((DayOfWeek()==3) && (Hour() > w_start1 && Hour() < w_stop1)) 
+      {
+        result=1;
+      } 
+   }
+   if((NewsWednesday2_start>0)  && (NewsWednesday1_stop>0 )) 
+   {
+    datetime w_start2=NewsWednesday2_start ;
+    datetime w_stop2=NewsWednesday2_stop; 
+    if((DayOfWeek()==3) && (Hour() > w_start2 && Hour() < w_stop2)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsWednesday3_start>0)  && (NewsWednesday3_stop>0 )) 
+   {
+    datetime w_start3=NewsWednesday3_start ;
+    datetime w_stop3=NewsWednesday3_stop; 
+    if((DayOfWeek()==3) && (Hour() > w_start3 && Hour() < w_stop3)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsThursday1_start>0)  && (NewsThursday1_stop>0 )) 
+   {
+    datetime th_start1=NewsThursday1_start ;
+    datetime th_stop1=NewsThursday1_stop; 
+    if((DayOfWeek()==4) && (Hour() > th_start1 && Hour() < th_stop1)) 
+      {
+        result=1;
+      } 
+   }
+   if((NewsThursday2_start>0)  && (NewsThursday2_stop>0 )) 
+   {
+    datetime th_start2=NewsThursday2_start ;
+    datetime th_stop2=NewsThursday2_stop; 
+    if((DayOfWeek()==4) && (Hour() > th_start2 && Hour() < th_stop2)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsThursday3_start>0)  && (NewsThursday3_stop>0 )) 
+   {
+    datetime th_start3=NewsThursday3_start ;
+    datetime th_stop3=NewsThursday3_stop; 
+    if((DayOfWeek()==4) && (Hour() > th_start3 && Hour() < th_stop3)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsFriday1_start>0)  && (NewsFriday1_stop>0 )) 
+   {
+    datetime f_start1=NewsFriday2_start ;
+    datetime f_stop1=NewsFriday2_stop; 
+    if((DayOfWeek()==5) && (Hour() > f_start1 && Hour() < f_stop1)) 
+      {
+        result=1;
+      } 
+   }
+   if((NewsFriday2_start>0)  && (NewsFriday2_stop>0 )) 
+   {
+    datetime f_start2=NewsFriday2_start ;
+    datetime f_stop2=NewsFriday2_stop; 
+    if((DayOfWeek()==5) && (Hour() > f_start2 && Hour() < f_stop2)) 
+      {
+        result=1;
+      } 
+   } 
+   if((NewsFriday3_start>0)  && (NewsFriday3_stop>0 )) 
+   {
+    datetime f_start3=NewsFriday3_start ;
+    datetime f_stop3=NewsFriday3_stop; 
+    if((DayOfWeek()==5) && (Hour() > f_start3 && Hour() < f_stop3)) 
+      {
+        result=1;
+      } 
+   } 
+   return (result) ;
+}
+
+/*
+bool IsNewCandle()
+{
+   if (NewCandleTime == iTime(Symbol(), PERIOD_M1, 0)) return false;
+   else
+     {
+       NewCandleTime = iTime(Symbol(), PERIOD_M1, 0);
+       return true;
+     }
+}
+*/
